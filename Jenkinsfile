@@ -1,6 +1,7 @@
-pipeline {
+@Library('lab4') _
 
-    agent any
+pipeline {
+    agent { label 'worker-agent' }
 
     environment {
         DOCKER_IMAGE = "mohamedmotaz350/app"
@@ -10,87 +11,26 @@ pipeline {
     }
 
     stages {
-
         stage('Run Unit Test') {
-            steps {
-                sh "mvn test"
-            }
+            steps { unitTest() }
         }
 
         stage('Build App') {
-            steps {
-                sh "mvn package "
-            }
+            steps { buildApp() }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                sh "docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} ."
-            }
+        stage('Build & Push Docker Image') {
+            steps { buildAndPushImage(DOCKER_IMAGE, 'DockerHub') }
         }
 
-        stage('Push Image to DockerHub') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'DockerHub',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh """
-                    docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
-                    docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
-                    """
-                }
-            }
-        }
-
-        stage('Delete Local Image') {
-            steps {
-                sh "docker rmi ${DOCKER_IMAGE}:${IMAGE_TAG} || true"
-            }
-        }
-
-        stage('Update Deployment File') {
-            steps {
-                sh """
-                sed -i 's|image:.*|image: ${DOCKER_IMAGE}:${IMAGE_TAG}|g' ${DEPLOYMENT_FILE}
-                """
-            }
-        }
-
-        stage('Deploy to Kubernetes (ServiceAccount)') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'APIServer', variable: 'APISERVER'),
-                    string(credentialsId: 'serviceaccount-token', variable: 'TOKEN')
-                ]) {
-                    sh """
-                    kubectl apply \
-                        --server="$APISERVER" \
-                        --token="$TOKEN" \
-                        --insecure-skip-tls-verify=true \
-                        -f ${DEPLOYMENT_FILE}
-
-                    kubectl apply \
-                        --server="$APISERVER" \
-                        --token="$TOKEN" \
-                        --insecure-skip-tls-verify=true \
-                        -f ${SERVICE_FILE}
-                    """
-                }
-            }
+        stage('Deploy to Kubernetes') {
+            steps { deployToK8s(DEPLOYMENT_FILE, SERVICE_FILE, 'APIServer', 'serviceaccount-token') }
         }
     }
 
     post {
-        always {
-            echo "Pipeline finished "
-        }
-        success {
-            echo "Pipeline succeeded "
-        }
-        failure {
-            echo "Pipeline failed"
-        }
+        always { echo "Pipeline finished" }
+        success { echo "Pipeline succeeded" }
+        failure { echo "Pipeline failed" }
     }
 }
