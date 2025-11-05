@@ -8,23 +8,34 @@ pipeline {
         IMAGE_TAG = "v${BUILD_NUMBER}"
         DEPLOYMENT_FILE = "deployment.yaml"
         SERVICE_FILE = "service.yaml"
+        DOCKER_CRED_ID = "DockerHub"
+        K8S_TOKEN_ID = "serviceaccount-token"
+        K8S_APISERVER_ID = "APIServer"
     }
 
     stages {
-        stage('Run Unit Test') {
-            steps { unitTest() }
+        stage('Run Unit Tests') {
+            steps {
+                unitTest()
+            }
         }
 
         stage('Build App') {
-            steps { buildApp() }
+            steps {
+                buildApp()
+            }
         }
 
-        stage('Build & Push Docker Image') {
-            steps { buildAndPushImage(DOCKER_IMAGE, 'DockerHub') }
+        stage('Build and Push Docker Image') {
+            steps {
+                buildAndPushImage(DOCKER_IMAGE, IMAGE_TAG, DOCKER_CRED_ID)
+            }
         }
 
         stage('Deploy to Kubernetes') {
-            steps { deployToK8s(DEPLOYMENT_FILE, SERVICE_FILE, 'APIServer', 'serviceaccount-token') }
+            steps {
+                deployToK8s(DEPLOYMENT_FILE, SERVICE_FILE, "${DOCKER_IMAGE}:${IMAGE_TAG}", K8S_TOKEN_ID, K8S_APISERVER_ID)
+            }
         }
     }
 
