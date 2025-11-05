@@ -20,4 +20,4 @@ spec:
         image: mohamedmotaz350/app
         ports:
         - containerPort: 80
-        imagePullPolicy: always
+        imagePullPolicy: Always
