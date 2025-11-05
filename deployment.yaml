@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: app-deployment
-  namespace: app1
+  namespace: stag
   labels:
     app: app
 spec:
