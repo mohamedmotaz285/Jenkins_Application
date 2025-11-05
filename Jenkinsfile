@@ -1,96 +1,47 @@
-pipeline {
+@Library('lab4') _
 
-    agent any
+pipeline {
+    agent { label 'worker-agent' }
 
     environment {
         DOCKER_IMAGE = "mohamedmotaz350/app"
         IMAGE_TAG = "v${BUILD_NUMBER}"
         DEPLOYMENT_FILE = "deployment.yaml"
         SERVICE_FILE = "service.yaml"
+        DOCKER_CRED_ID = "DockerHub"
+        K8S_TOKEN_ID = "serviceaccount-token"
+        K8S_APISERVER_ID = "APIServer"
     }
 
     stages {
-
-        stage('Run Unit Test') {
+        stage('Run Unit Tests') {
             steps {
-                sh "mvn test"
+                unitTests()
             }
         }
 
         stage('Build App') {
             steps {
-                sh "mvn package "
+                buildApp()
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build and Push Docker Image') {
             steps {
-                sh "docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} ."
+                buildAndPushImage(DOCKER_IMAGE, IMAGE_TAG, DOCKER_CRED_ID)
             }
         }
 
-        stage('Push Image to DockerHub') {
+        stage('Deploy to Kubernetes') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'DockerHub',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh """
-                    docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
-                    docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
-                    """
-                }
-            }
-        }
-
-        stage('Delete Local Image') {
-            steps {
-                sh "docker rmi ${DOCKER_IMAGE}:${IMAGE_TAG} || true"
-            }
-        }
-
-        stage('Update Deployment File') {
-            steps {
-                sh """
-                sed -i 's|image:.*|image: ${DOCKER_IMAGE}:${IMAGE_TAG}|g' ${DEPLOYMENT_FILE}
-                """
-            }
-        }
-
-        stage('Deploy to Kubernetes (ServiceAccount)') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'APIServer', variable: 'APISERVER'),
-                    string(credentialsId: 'serviceaccount-token', variable: 'TOKEN')
-                ]) {
-                    sh """
-                    kubectl apply \
-                        --server="$APISERVER" \
-                        --token="$TOKEN" \
-                        --insecure-skip-tls-verify=true \
-                        -f ${DEPLOYMENT_FILE}
-
-                    kubectl apply \
-                        --server="$APISERVER" \
-                        --token="$TOKEN" \
-                        --insecure-skip-tls-verify=true \
-                        -f ${SERVICE_FILE}
-                    """
-                }
+                deployToK8s(DEPLOYMENT_FILE, SERVICE_FILE, "${DOCKER_IMAGE}:${IMAGE_TAG}", K8S_TOKEN_ID, K8S_APISERVER_ID)
             }
         }
     }
 
     post {
-        always {
-            echo "Pipeline finished "
-        }
-        success {
-            echo "Pipeline succeeded "
-        }
-        failure {
-            echo "Pipeline failed"
-        }
+        always { echo "Pipeline finished" }
+        success { echo "Pipeline succeeded" }
+        failure { echo "Pipeline failed" }
     }
 }
