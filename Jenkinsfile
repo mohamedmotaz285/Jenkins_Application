@@ -16,7 +16,7 @@ pipeline {
     stages {
         stage('Run Unit Tests') {
             steps {
-                unitTest()
+                unitTests()
             }
         }
 
