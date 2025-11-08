@@ -11,6 +11,7 @@ pipeline {
         DOCKER_CRED_ID = "DockerHub"
         K8S_TOKEN_ID = "serviceaccount-token"
         K8S_APISERVER_ID = "APIServer"
+        GIT_CRED_ID = "github-cred"
     }
 
     stages {
@@ -29,6 +30,20 @@ pipeline {
         stage('Build and Push Docker Image') {
             steps {
                 buildAndPushImage(DOCKER_IMAGE, IMAGE_TAG, DOCKER_CRED_ID)
+            }
+        }
+
+         stage('Push Updates to GitHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: GIT_CRED_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                    sh """
+                    git config user.email "jenkins@example.com"
+                    git config user.name "Jenkins"
+                    git add ${DEPLOYMENT_FILE} ${SERVICE_FILE}
+                    git commit -m "Update image to ${DOCKER_IMAGE}:${IMAGE_TAG}"
+                    git push https://$GIT_USER:$GIT_PASS@github.com/mohamedmotaz285/Jenkins_Application.git main
+                    """
+                }
             }
         }
 
