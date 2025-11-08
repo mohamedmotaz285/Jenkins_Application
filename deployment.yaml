@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: app-container
-        image: mohamedmotaz350/app:v1
+        image: mohamedmotaz350/app
         ports:
         - containerPort: 80
         imagePullPolicy: Always
